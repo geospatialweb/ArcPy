@@ -1,0 +1,188 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Module xmlns:fx="http://ns.adobe.com/mxml/2009"
+		   xmlns:mx="library://ns.adobe.com/flex/mx"
+		   creationComplete="creationCompleteHandler()">
+	
+	<fx:Script>
+		<![CDATA[
+			import com.esri.ags.Graphic;
+			import com.esri.ags.events.GeoprocessorEvent;
+			import com.esri.ags.geometry.Polygon;
+			import com.esri.ags.geometry.WebMercatorMapPoint;
+			import com.esri.ags.symbols.SimpleFillSymbol;
+			import com.esri.ags.symbols.SimpleLineSymbol;
+			import com.esri.ags.symbols.SimpleMarkerSymbol;
+			import com.esri.ags.tasks.Geoprocessor;
+			import com.esri.ags.tasks.supportClasses.JobInfo;
+			import com.esri.ags.tasks.supportClasses.ParameterValue;
+			import com.esri.ags.utils.WebMercatorUtil;
+			
+			import components.Export_to_PDF_PopUp;
+			import components.supportClasses.FileDownloader;
+			
+			import mx.controls.Alert;
+			import mx.events.CloseEvent;
+			import mx.managers.PopUpManager;
+			import mx.rpc.events.FaultEvent;
+			
+			private var buffer1:Graphic;
+			private var buffer2:Graphic;
+			private var exportToPDF:Export_to_PDF_PopUp;
+			private var fileDownloader:FileDownloader = new FileDownloader();
+			private var gp:Geoprocessor = new Geoprocessor("http://geospatialweb.me:8080/ArcGIS/rest/services/ERIS/ERISLayout/GPServer/ERISLayout");
+			private var param:Object = {};
+			private var sitePoint:Graphic;
+			
+			private function creationCompleteHandler():void
+			{
+				exportToPDF = PopUpManager.createPopUp(this, Export_to_PDF_PopUp) as Export_to_PDF_PopUp;
+				exportToPDF["scan_submit"].addEventListener(MouseEvent.CLICK, exportPDFHandler);
+				exportToPDF["print_submit"].addEventListener(MouseEvent.CLICK, downloadPDFHandler);
+				exportToPDF.addEventListener(MouseEvent.MOUSE_OVER, mouseCursorHandler);
+				exportToPDF.scan_submit.enabled = true;
+				exportToPDF.print_submit.enabled = false;
+				
+				gp.disableClientCaching = true;
+				gp.addEventListener(GeoprocessorEvent.JOB_COMPLETE, jobCompleteHandler);
+				gp.addEventListener(GeoprocessorEvent.STATUS_UPDATE, jobStatusHandler);
+				gp.addEventListener(GeoprocessorEvent.GET_RESULT_DATA_COMPLETE, createOutputHandler);
+				gp.addEventListener(FaultEvent.FAULT, faultEventHandler);
+			}
+			
+			private function exportPDFHandler(event:MouseEvent):void
+			{
+				exportToPDF.scan_submit.enabled = false;
+				exportToPDF.print_submit.enabled = false;
+				exportToPDF.swfMessage.visible = true;
+				exportToPDF.jobStatus.text = "Job Waiting";
+				exportToPDF.dlStatus.text = "";
+				
+				param = setParameters();
+				
+				if (sitePoint || buffer1 || buffer2)
+				{
+					parentApplication.map.level = 16;
+					parentApplication.map.centerAt(new WebMercatorMapPoint(param.MidX, param.MidY));
+					
+					if (sitePoint)
+					{
+						parentApplication.gl.remove(sitePoint);
+					}
+						
+					if (buffer1)
+					{
+						parentApplication.gl.remove(buffer1);
+					}
+						
+					if (buffer2)
+					{
+						parentApplication.gl.remove(buffer2);
+					}
+				}
+				
+				if (exportToPDF.server.selectedItem.serverName == "Geospatial Web")
+				{
+					gp.submitJob(param);
+				}
+				else
+				{
+					exportToPDF.scan_submit.enabled = true;
+					exportToPDF.swfMessage.visible = false;
+					exportToPDF.jobStatus.text = "Amazon EC2 Server Disabled Presently";
+				}
+			}
+			
+			private function setParameters():Object
+			{
+				param.MapType = exportToPDF.mapType.selectedItem.mapName;
+				param.OrderID = "12345678901";
+				param.MidX = -79.065;
+				param.MidY = 44.265;
+				param.Scale = 24000;
+				param.Buffer1Distance = 250;
+				param.Buffer2Distance = 1250;
+				
+				return param;
+			}
+			
+			private function jobCompleteHandler(event:GeoprocessorEvent):void
+			{
+				exportToPDF.scan_submit.enabled = true;
+				exportToPDF.print_submit.enabled = true;
+				exportToPDF.swfMessage.visible = false;
+				
+				if (event.jobInfo.jobStatus == "esriJobFailed")
+				{
+					exportToPDF.jobStatus.text = "Job Failed";
+					Alert.show("Job Failed");
+				}
+				else
+				{					
+					parentApplication.map.level = 15;
+					parentApplication.map.centerAt(new WebMercatorMapPoint(param.MidX, param.MidY));
+					exportToPDF.dlStatus.text = "PDF Ready for Download  (~1MB)";
+						
+					sitePoint = new Graphic(new WebMercatorMapPoint(param.MidX, param.MidY), new SimpleMarkerSymbol(SimpleMarkerSymbol.STYLE_X, 10, 0xFF0000, 0.8, 0, 0, 0, new SimpleLineSymbol(SimpleLineSymbol.STYLE_SOLID, 0xFF0000, 0.8, 2)));
+					parentApplication.gl.add(sitePoint);
+					
+					gp.getResultData(event.jobInfo.jobId, "PDF");
+					gp.getResultData(event.jobInfo.jobId, "Buffer1");
+					gp.getResultData(event.jobInfo.jobId, "Buffer2");
+				}
+			}
+			
+			private function jobStatusHandler(event:GeoprocessorEvent):void
+			{
+				exportToPDF.jobStatus.text = event.jobInfo.jobStatus.replace("esriJob", "Job ");
+			}
+			
+			private function createOutputHandler(event:GeoprocessorEvent):void
+			{
+				switch (event.parameterValue.paramName)
+				{
+					case "PDF":
+					{
+						var url:String = event.parameterValue.value.url.replace("p2432323", "geospatialweb.me");
+						fileDownloader.url = url;
+						fileDownloader.fileName = url.slice(url.lastIndexOf("/") + 1).replace(".pdf", "");
+						break;
+					}
+					case "Buffer1":
+					{
+						buffer1 = new Graphic(WebMercatorUtil.geographicToWebMercator(event.parameterValue.value.features[0].geometry as Polygon), new SimpleFillSymbol(SimpleFillSymbol.STYLE_NULL, 0x000000, 0.8, new SimpleLineSymbol(SimpleLineSymbol.STYLE_SOLID, 0xFF0000, 0.8, 2)));
+						parentApplication.gl.add(buffer1);
+						break;
+					}
+					case "Buffer2":
+					{
+						buffer2 = new Graphic(WebMercatorUtil.geographicToWebMercator(event.parameterValue.value.features[0].geometry as Polygon), new SimpleFillSymbol(SimpleFillSymbol.STYLE_NULL, 0x000000, 0.8, new SimpleLineSymbol(SimpleLineSymbol.STYLE_DASH, 0x7D26CD, 0.8, 2)));
+						parentApplication.gl.add(buffer2);
+					}
+				}
+			}
+			
+			private function downloadPDFHandler(event:MouseEvent):void
+			{
+				fileDownloader.downloadFile();
+			}
+			
+			private function mouseCursorHandler(event:MouseEvent):void
+			{
+				Mouse.cursor = "auto";
+			}
+			
+			private function faultEventHandler(event:FaultEvent):void
+			{
+				var fault:String = event.fault.faultString;
+				
+				exportToPDF.scan_submit.enabled = true;
+				exportToPDF.print_submit.enabled = true;
+				exportToPDF.swfMessage.visible = false;
+				exportToPDF.jobStatus.text = "Job Failed";
+				
+				Alert.show(fault);
+			}
+		]]>
+	</fx:Script>
+
+</mx:Module>

@@ -1,0 +1,166 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Application xmlns:fx="http://ns.adobe.com/mxml/2009"
+			   xmlns:mx="library://ns.adobe.com/flex/mx"
+			   xmlns:s="library://ns.adobe.com/flex/spark"
+			   xmlns:esri="http://www.esri.com/2008/ags"
+			   creationComplete="creationCompleteHandler()"
+			   width="960" height="900">
+	
+	<fx:Script>
+		<![CDATA[
+			import com.esri.ags.geometry.MapPoint;
+			import com.esri.ags.geometry.WebMercatorMapPoint;
+			import com.esri.ags.layers.ArcGISTiledMapServiceLayer;
+			import com.esri.ags.layers.GraphicsLayer;
+			import com.esri.ags.layers.WebTiledLayer;
+			import com.esri.ags.utils.WebMercatorUtil;
+			
+			import mx.collections.ArrayCollection;
+			import mx.events.ItemClickEvent;
+			
+			public var gl:GraphicsLayer = new GraphicsLayer();
+			
+			[Bindable]
+			private var baseMaps:ArrayCollection = new ArrayCollection();
+			
+			private function creationCompleteHandler():void
+			{
+				addBasemaps();
+				
+				gl.spatialReference = map.spatialReference;
+				map.addLayer(gl);
+				
+				map.level = 16;
+				map.centerAt(new WebMercatorMapPoint(-79.065, 44.265));
+				map.addEventListener(MouseEvent.MOUSE_MOVE, mouseMoveHandler);
+				
+				ml.url = "widgets/Export_to_PDF.swf";
+			}
+			
+			private function addBasemaps():void
+			{
+				var mapBox_Black:WebTiledLayer = new WebTiledLayer("http://{subDomain}.tiles.mapbox.com/v3/examples.map-cnkhv76j/{level}/{col}/{row}.png");
+				mapBox_Black.name = "Black";
+				mapBox_Black.subDomains = [ "a", "b", "c", "d" ];
+				mapBox_Black.visible = true;
+				
+				map.addLayer(mapBox_Black);
+				baseMaps.addItem(mapBox_Black.name);
+				
+				var mapBox_Streets:WebTiledLayer = new WebTiledLayer("http://{subDomain}.tiles.mapbox.com/v3/examples.map-vyofok3q/{level}/{col}/{row}.png");
+				mapBox_Streets.name = "Streets";
+				mapBox_Streets.subDomains = [ "a", "b", "c", "d" ];
+				mapBox_Streets.visible = false;
+				
+				map.addLayer(mapBox_Streets);
+				baseMaps.addItem(mapBox_Streets.name);
+				
+				var mapBox_Topo:WebTiledLayer = new WebTiledLayer("http://{subDomain}.tiles.mapbox.com/v3/mapbox.mapbox-warden/{level}/{col}/{row}.png");
+				mapBox_Topo.name = "Topo";
+				mapBox_Topo.subDomains = [ "a", "b", "c", "d" ];
+				mapBox_Topo.visible = false;
+				
+				map.addLayer(mapBox_Topo);
+				baseMaps.addItem(mapBox_Topo.name);
+				
+				var esri_Aerial:ArcGISTiledMapServiceLayer = new ArcGISTiledMapServiceLayer("http://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer");
+				esri_Aerial.attributionVisible = false;
+				esri_Aerial.name = "Aerial";
+				esri_Aerial.visible = false;
+				
+				map.addLayer(esri_Aerial);				
+				baseMaps.addItem(esri_Aerial.name);
+			}
+			
+			private function mouseMoveHandler(event:MouseEvent):void
+			{
+				const mapPoint:MapPoint = map.toMapFromStage(event.stageX, event.stageY);
+				const latlong:MapPoint = WebMercatorUtil.webMercatorToGeographic(mapPoint) as MapPoint;
+				
+				degrees.text = "Lng/Lat: " + latlong.x.toFixed(6) + "  " + latlong.y.toFixed(6);
+				metres.text = "X,Y Metres: " + mapPoint.x.toFixed(0) + "  " + mapPoint.y.toFixed(0);
+			}
+			
+			private function bb_changeHandler():void
+			{
+				for (var i:int = 0; i < baseMaps.length; i++)
+				{
+					if (map.layers[i].name == bb.selectedItem)
+					{
+						map.layers[i].visible = true;
+					}
+					else
+					{
+						map.layers[i].visible = false;
+					}
+				}
+			}
+		]]>
+	</fx:Script>
+	
+	<esri:Map id="map"
+			  logoVisible="false"
+			  openHandCursorVisible="false"
+			  wrapAround180="true">
+		<esri:extent>
+			<esri:Extent xmin="-10000000" ymin="5000000"
+						 xmax="-8000000" ymax="6000000">
+				<esri:SpatialReference wkid="3857" />
+			</esri:Extent>
+		</esri:extent>
+	</esri:Map>
+	
+	<s:ModuleLoader id="ml" />
+	
+	<s:ButtonBar id="bb"
+				 left="665" top="10"
+				 change="bb_changeHandler()"
+				 dataProvider="{baseMaps}"
+				 requireSelection="true" 
+				 selectedIndex="0" />
+	
+	<s:controlBarLayout>
+		<s:HorizontalLayout paddingTop="1" paddingBottom="1"
+							verticalAlign="middle" />
+	</s:controlBarLayout>
+	
+	<s:controlBarContent>
+		<s:Spacer />
+		<s:Image source="@Embed('assets/images/i-globe.png')" />
+		
+		<s:VGroup>
+			<mx:Label text="Geospatial Web"
+					  fontSize="18"
+					  paddingTop="3" />
+			<mx:Label text="johncampbell@geospatialweb.ca"
+					  fontSize="10"
+					  paddingLeft="2" paddingTop="-12" />
+		</s:VGroup>
+		
+		<mx:ToggleButtonBar id="tbb"
+							chromeColor="#CCCCCC"
+							height="30"
+							labelField="null"
+							paddingLeft="20"
+							selectedIndex="5">
+			<mx:dataProvider>
+				<fx:Object icon="@Embed(source='assets/images/home.png')" label="aqi" toolTip="Ontario Air Quality Index" />
+				<fx:Object icon="@Embed(source='assets/images/widget.png')" label="aqo" toolTip="Air Quality Ontario Readings" />
+				<fx:Object icon="@Embed(source='assets/images/service.png')" label="google" toolTip="Diagnostic Surface Vector Analysis" />
+				<fx:Object icon="@Embed(source='assets/images/target.png')" label="geocode_A" toolTip="Geocoder.ca - Locate Address" />
+				<fx:Object icon="@Embed(source='assets/images/target.png')" label="geocode_P" toolTip="Geocoder.ca - Locate Postal Code" />
+				<fx:Object icon="@Embed(source='assets/images/tools.png')" label="export" toolTip="Map Export to PDF" />
+			</mx:dataProvider>
+		</mx:ToggleButtonBar>
+		
+		<s:VGroup>
+			<mx:Label id="degrees"
+					  fontSize="10" text="Lng/Lat:"
+					  paddingLeft="70" paddingTop="4" />
+			<mx:Label id="metres"
+					  fontSize="10" text="X,Y Metres:"
+					  paddingLeft="70" paddingTop="-11" />
+		</s:VGroup>
+	</s:controlBarContent>
+
+</s:Application>

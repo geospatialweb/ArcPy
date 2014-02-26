@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:TitleWindow xmlns:fx="http://ns.adobe.com/mxml/2009"
+			   xmlns:mx="library://ns.adobe.com/flex/mx"
+			   xmlns:s="library://ns.adobe.com/flex/spark"
+			   title="Map Export to PDF"
+			   windowMoving="windowMovingHandler(event)"
+			   x="650" y="90" width="300" height="300">
+	
+	<fx:Script>
+		<![CDATA[
+			import mx.collections.ArrayCollection;
+			
+			import spark.events.TitleWindowBoundsEvent;
+			
+			[Bindable]
+			private var maps:ArrayCollection = new ArrayCollection(
+			[
+				{mapName:"OBM"},
+				{mapName:"Soils"},
+				{mapName:"Physiography"},
+				{mapName:"ANSI"},
+				{mapName:"Surficial Geology"},
+				{mapName:"Bedrock Geology"}
+			]);
+			
+			[Bindable]
+			private var servers:ArrayCollection = new ArrayCollection(
+			[
+				{serverName:"Geospatial Web"},
+				{serverName:"Amazon EC2 Instance"}
+			]);
+			
+			private function windowMovingHandler(event:TitleWindowBoundsEvent):void
+			{
+				if (event.afterBounds.left < 0)
+				{
+					event.afterBounds.left = 0;
+				} 
+				else if (event.afterBounds.right > systemManager.stage.stageWidth)
+				{
+					event.afterBounds.left = systemManager.stage.stageWidth - event.afterBounds.width;
+				}
+				
+				if (event.afterBounds.top < 46)
+				{
+					event.afterBounds.top = 46;
+				} 
+				else if (event.afterBounds.bottom > systemManager.stage.stageHeight)
+				{
+					event.afterBounds.top = systemManager.stage.stageHeight - event.afterBounds.height;
+				}
+			}
+		]]>
+	</fx:Script>
+	
+	<s:DropDownList id="mapType"
+					dataProvider="{maps}"
+					horizontalCenter="0"
+					labelField="mapName"
+					requireSelection="true"
+					textAlign="center"
+					width="140" top="15" />
+	
+	<s:DropDownList id="server"
+					dataProvider="{servers}"
+					horizontalCenter="0"
+					labelField="serverName"
+					requireSelection="true"
+					textAlign="center"
+					width="140" top="50" />
+	
+	<s:Label id="jobStatus"
+			 color="0x00AAAA"
+			 horizontalCenter="0"
+			 x="110" y="185" />
+	
+	<s:Label id="dlStatus"
+			 color="0x00AA00"
+			 horizontalCenter="0"
+			 x="90" y="205" />
+	
+	<s:controlBarContent>
+		<s:HGroup horizontalAlign="center"
+				  width="100%" >
+			<s:Button id="scan_submit"
+					  label="Submit Job" />
+			<mx:Image id="swfMessage"
+					  source="assets/images/loader.swf"
+					  visible="false" />
+			<s:Button id="print_submit"
+					  enabled="false"
+					  label="Download PDF" />
+		</s:HGroup>
+	</s:controlBarContent>
+
+</s:TitleWindow>
