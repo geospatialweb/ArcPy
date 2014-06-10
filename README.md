@@ -1,7 +1,7 @@
 ArcPy
 =====
 
-geospatialweb.ca:8000/ArcPy
+http://geospatialweb.ca:8000/ArcPy
 
 Experimental project to produce PDFs from multiple ArcGIS mxd resident on ArcGIS Server 10. Additionally, data from feature attribute tables was output to and formatted in MS Excel on the fly within the Python script.
 
